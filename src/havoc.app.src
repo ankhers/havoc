@@ -10,7 +10,7 @@
   {env,[]},
   {modules, []},
 
-  {maintainers, []},
+  {maintainers, ["Justin Wood"]},
   {licenses, ["Apache 2.0"]},
   {links, []}
  ]}.
