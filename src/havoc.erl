@@ -56,6 +56,7 @@ handle_cast(_Msg, State) ->
 
 handle_info(kill_something, #state{is_active = true} = State) ->
     try_kill_one(),
+    schedule(State#state.avg_wait),
     {noreply, State};
 handle_info(_Msg, State) ->
     {noreply, State}.
