@@ -93,7 +93,8 @@ kill_one([Pid | T]) ->
 -spec is_killable(pid(), atom()) -> boolean().
 is_killable(Pid, App) ->
     not(erts_internal:is_system_process(Pid))
-        andalso not(lists:member(App, [kernel, havoc])).
+        andalso not(lists:member(App, [kernel, havoc]))
+        andalso not(is_shell(Pid)).
 
 kill(Pid) ->
     erlang:monitor(process, Pid),
@@ -106,5 +107,22 @@ kill(Pid) ->
             receive
                 {'DOWN', _, process, Pid, Reason} ->
                     {ok, Reason}
+            end
+    end.
+
+-spec is_shell(pid()) -> boolean().
+is_shell(Pid) ->
+    case erlang:process_info(Pid, group_leader) of
+        undefined -> false;
+        {group_leader, Leader} ->
+            case lists:keyfind(shell, 1, group:interfaces(Leader)) of
+                {shell, Pid} -> true;
+                {shell, Shell} ->
+                    case erlang:process_info(Shell, dictionary) of
+                        {dictionary, Dict} ->
+                            proplists:get_value(evaluator, Dict) =:= Pid;
+                        undefined -> false
+                    end;
+                false -> false
             end
     end.
