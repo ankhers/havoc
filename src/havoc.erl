@@ -9,7 +9,7 @@
 
 %% API
 -export([start_link/0]).
--export([on/0, off/0]).
+-export([on/0, on/1, off/0]).
 
 %% GenServer callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
@@ -31,6 +31,10 @@ start_link() ->
 -spec on() -> ok.
 on() ->
     gen_server:call(havoc, {on, []}).
+
+-spec on(list(term)) -> ok.
+on(Opts) ->
+    gen_server:call(havoc, {on, Opts}).
 
 -spec off() -> ok.
 off() ->
