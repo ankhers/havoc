@@ -1,38 +1,41 @@
 %%%-------------------------------------------------------------------
-%% @doc havoc top level supervisor.
+%% @doc havoc
 %% @end
 %%%-------------------------------------------------------------------
 
--module(havoc_sup).
+-module(havoc).
 
--behaviour(supervisor).
+-behaviour(gen_server).
 
 %% API
 -export([start_link/0]).
 
-%% Supervisor callbacks
--export([init/1]).
+%% GenServer callbacks
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
 
 -define(SERVER, ?MODULE).
 
 %%====================================================================
 %% API functions
 %%====================================================================
-
 start_link() ->
-    supervisor:start_link({local, ?SERVER}, ?MODULE, []).
+    gen_server:start_link({local, ?SERVER}, ?MODULE, ok, []).
 
 %%====================================================================
-%% Supervisor callbacks
+%% GenServer callbacks
 %%====================================================================
 
-%% Child :: #{id => Id, start => {M, F, A}}
-%% Optional keys are restart, shutdown, type, modules.
-%% Before OTP 18 tuples must be used to specify a child. e.g.
-%% Child :: {Id,StartFunc,Restart,Shutdown,Type,Modules}
-init([]) ->
-    Havoc = #{id => havoc, start => {havoc, start_link, []}},
-    {ok, { {one_for_all, 0, 1}, [Havoc]} }.
+init(ok) ->
+    {ok, ok}.
+
+handle_call(_Msg, _From, State) ->
+    {noreply, State}.
+
+handle_cast(_Msg, State) ->
+    {noreply, State}.
+
+handle_info(_Msg, State) ->
+    {noreply, State}.
 
 %%====================================================================
 %% Internal functions
