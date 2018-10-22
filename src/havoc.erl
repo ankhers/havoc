@@ -28,9 +28,11 @@
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, ok, []).
 
+-spec on() -> ok.
 on() ->
     gen_server:call(havoc, {on, []}).
 
+-spec off() -> ok.
 off() ->
     gen_server:call(havoc, off).
 
@@ -68,6 +70,7 @@ handle_info(_Msg, State) ->
 schedule(Wait) ->
     erlang:send_after(Wait, self(), kill_something).
 
+-spec try_kill_one() -> {ok, term()} | {error, nothing_to_kill}.
 try_kill_one() ->
     Processes = shuffle(erlang:processes()),
     kill_one(Processes).
@@ -77,6 +80,7 @@ shuffle(L) ->
     Shuffled = lists:sort([{rand:uniform(), X} || X <- L]),
     [X || {_, X} <- Shuffled].
 
+-spec kill_one(list(pid())) -> {ok, term()} | {error, nothing_to_kill}.
 kill_one([]) -> {error, nothing_to_kill};
 kill_one([Pid | T]) ->
     App = case application:get_application(Pid) of
@@ -96,6 +100,7 @@ is_killable(Pid, App) ->
         andalso not(lists:member(App, [kernel, havoc]))
         andalso not(is_shell(Pid)).
 
+-spec kill(pid()) -> term().
 kill(Pid) ->
     erlang:monitor(process, Pid),
     exit(Pid, havoc),
