@@ -17,7 +17,9 @@
 -define(SERVER, ?MODULE).
 
 -record(state, {is_active = false,
-                avg_wait
+                avg_wait,
+                process,
+                tcp
                }).
 
 -define(DEFAULT_OPTS, [{avg_wait, 5000}]).
@@ -49,7 +51,11 @@ init(ok) ->
 
 handle_call({on, Opts}, _From, #state{is_active = false} = State) ->
     Wait = proplists:get_value(avg_wait, Opts, 5000),
-    NewState = State#state{is_active = true, avg_wait = Wait},
+    Killable = proplists:get_value(killable, Opts, [process]),
+    Process = proplists:get_bool(process, Killable),
+    Tcp = proplists:get_bool(tcp, Killable),
+    NewState = State#state{is_active = true, avg_wait = Wait,
+                           process = Process, tcp = Tcp},
     schedule(Wait),
     {reply, ok, NewState};
 handle_call(off, _From, #state{is_active = true} = State) ->
@@ -61,7 +67,7 @@ handle_cast(_Msg, State) ->
     {noreply, State}.
 
 handle_info(kill_something, #state{is_active = true} = State) ->
-    try_kill_one(),
+    try_kill_one(State),
     schedule(State#state.avg_wait),
     {noreply, State};
 handle_info(_Msg, State) ->
@@ -74,10 +80,24 @@ handle_info(_Msg, State) ->
 schedule(Wait) ->
     erlang:send_after(Wait, self(), kill_something).
 
--spec try_kill_one() -> {ok, term()} | {error, nothing_to_kill}.
-try_kill_one() ->
-    Processes = shuffle(erlang:processes()),
-    kill_one(Processes).
+-spec try_kill_one(#state{}) -> {ok, term()} | {error, nothing_to_kill}.
+try_kill_one(State) ->
+    Processes = process_list(State#state.process),
+    Tcp = tcp_list(State#state.tcp),
+    Shuffled = shuffle(Processes ++ Tcp),
+    kill_one(Shuffled).
+
+-spec process_list(boolean()) -> list(pid()).
+process_list(true) ->
+    processes();
+process_list(false) ->
+    [].
+
+-spec tcp_list(boolean()) -> list(port()).
+tcp_list(true) ->
+    lists:filter(fun (Port) -> erlang:port_info(Port, name) =:= {name, "tcp_inet"} end, erlang:ports());
+tcp_list(false) ->
+    [].
 
 -spec shuffle(list()) -> list().
 shuffle(L) ->
@@ -86,26 +106,28 @@ shuffle(L) ->
 
 -spec kill_one(list(pid())) -> {ok, term()} | {error, nothing_to_kill}.
 kill_one([]) -> {error, nothing_to_kill};
-kill_one([Pid | T]) ->
-    App = case application:get_application(Pid) of
-              {ok, A} -> A;
-              undefined -> undefined
-          end,
-    case is_killable(Pid, App) of
+kill_one([H | T]) ->
+    case is_killable(H) of
         true ->
-            kill(Pid);
+            kill(H);
         false ->
             kill_one(T)
     end.
 
--spec is_killable(pid(), atom()) -> boolean().
-is_killable(Pid, App) ->
+-spec is_killable(pid() | port()) -> boolean().
+is_killable(Pid) when is_pid(Pid) ->
+    App = case application:get_application(Pid) of
+              {ok, A} -> A;
+              undefined -> undefined
+          end,
     not(erts_internal:is_system_process(Pid))
         andalso not(lists:member(App, [kernel, havoc]))
-        andalso not(is_shell(Pid)).
+        andalso not(is_shell(Pid));
+is_killable(Port) when is_port(Port) ->
+    true.
 
--spec kill(pid()) -> term().
-kill(Pid) ->
+-spec kill(pid() | port()) -> term().
+kill(Pid) when is_pid(Pid) ->
     erlang:monitor(process, Pid),
     exit(Pid, havoc),
     receive
@@ -117,7 +139,10 @@ kill(Pid) ->
                 {'DOWN', _, process, Pid, Reason} ->
                     {ok, Reason}
             end
-    end.
+    end;
+kill(Port) when is_port(Port) ->
+    io:format("Closing TCP Connection!", []),
+    gen_tcp:close(Port).
 
 -spec is_shell(pid()) -> boolean().
 is_shell(Pid) ->
