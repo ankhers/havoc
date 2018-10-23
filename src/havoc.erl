@@ -30,15 +30,15 @@ start_link() ->
 
 -spec on() -> ok.
 on() ->
-    gen_server:call(havoc, {on, []}).
+    gen_server:call(?SERVER, {on, []}).
 
 -spec on(list(term)) -> ok.
 on(Opts) ->
-    gen_server:call(havoc, {on, Opts}).
+    gen_server:call(?SERVER, {on, Opts}).
 
 -spec off() -> ok.
 off() ->
-    gen_server:call(havoc, off).
+    gen_server:call(?SERVER, off).
 
 %%====================================================================
 %% GenServer callbacks
