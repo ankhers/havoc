@@ -19,10 +19,13 @@
 -record(state, {is_active = false,
                 avg_wait,
                 process,
-                tcp
+                tcp,
+                udp
                }).
 
 -define(DEFAULT_OPTS, [{avg_wait, 5000}]).
+-define(TCP_NAME, "tcp_inet").
+-define(UDP_NAME, "udp_inet").
 
 %%====================================================================
 %% API functions
@@ -54,8 +57,9 @@ handle_call({on, Opts}, _From, #state{is_active = false} = State) ->
     Killable = proplists:get_value(killable, Opts, [process]),
     Process = proplists:get_bool(process, Killable),
     Tcp = proplists:get_bool(tcp, Killable),
+    Udp = poplists:get_bool(udp, Killable),
     NewState = State#state{is_active = true, avg_wait = Wait,
-                           process = Process, tcp = Tcp},
+                           process = Process, tcp = Tcp, udp = Udp},
     schedule(Wait),
     {reply, ok, NewState};
 handle_call(off, _From, #state{is_active = true} = State) ->
@@ -84,7 +88,8 @@ schedule(Wait) ->
 try_kill_one(State) ->
     Processes = process_list(State#state.process),
     Tcp = tcp_list(State#state.tcp),
-    Shuffled = shuffle(Processes ++ Tcp),
+    Udp = udp_list(State#state.udp),
+    Shuffled = shuffle(Processes ++ Tcp ++ Udp),
     kill_one(Shuffled).
 
 -spec process_list(boolean()) -> list(pid()).
@@ -95,9 +100,16 @@ process_list(false) ->
 
 -spec tcp_list(boolean()) -> list(port()).
 tcp_list(true) ->
-    lists:filter(fun (Port) -> erlang:port_info(Port, name) =:= {name, "tcp_inet"} end, erlang:ports());
+    lists:filter(fun (Port) -> erlang:port_info(Port, name) =:= {name, ?TCP_NAME} end, erlang:ports());
 tcp_list(false) ->
     [].
+
+-spec udp_list(boolean()) -> list(port()).
+udp_list(true) ->
+    lists:filter(fun (Port) -> erlang:port_info(Port, name) =:= {name, ?UDP_NAME} end, erlang:ports());
+udp_list(false) ->
+    [].
+
 
 -spec shuffle(list()) -> list().
 shuffle(L) ->
@@ -141,8 +153,12 @@ kill(Pid) when is_pid(Pid) ->
             end
     end;
 kill(Port) when is_port(Port) ->
-    io:format("Closing TCP Connection!", []),
-    gen_tcp:close(Port).
+    case erlang:port_info(Port, name) of
+        {name, ?TCP_NAME} ->
+            gen_tcp:close(Port);
+        {name, ?UDP_NAME} ->
+            gen_udp:close(Port)
+    end.
 
 -spec is_shell(pid()) -> boolean().
 is_shell(Pid) ->
