@@ -21,7 +21,8 @@
                 deviation,
                 process,
                 tcp,
-                udp
+                udp,
+                nodes
                }).
 
 -define(TCP_NAME, "tcp_inet").
@@ -50,6 +51,8 @@ on() ->
 %% <li>`process' - Whether or not to kill processes. (default true)</li>
 %% <li>`tcp' - Whether or not to kill TCP connections. (default false)</li>
 %% <li>`udp' - Whether or not to kill UDP connections. (default false)</li>
+%% <li>`nodes' - Either a list of atom node names, or a single atom that is
+%% accepted by `erlang:nodes/1'. (Default `this')</li>
 %% </ul>
 %% @end
 -spec on(list(term)) -> ok.
@@ -73,12 +76,17 @@ init(ok) ->
 handle_call({on, Opts}, _From, #state{is_active = false} = State) ->
     Wait = proplists:get_value(avg_wait, Opts, 5000),
     Deviation = proplists:get_value(deviation, Opts, 0.3),
-    Process = proplists:get_bool(process, Opts),
+    Process =
+        case proplists:lookup(process, Opts) of
+            {process, Val} -> Val;
+            none -> true
+        end,
     Tcp = proplists:get_bool(tcp, Opts),
     Udp = proplists:get_bool(udp, Opts),
+    Nodes = proplists:get_value(nodes, Opts, this),
     NewState = State#state{is_active = true, avg_wait = Wait,
                            deviation = Deviation, process = Process, tcp = Tcp,
-                           udp = Udp},
+                           udp = Udp, nodes = Nodes},
     schedule(Wait, Deviation),
     {reply, ok, NewState};
 handle_call(off, _From, #state{is_active = true} = State) ->
@@ -109,28 +117,40 @@ schedule(Wait, Deviation) ->
 
 -spec try_kill_one(#state{}) -> {ok, term()} | {error, nothing_to_kill}.
 try_kill_one(State) ->
-    Processes = process_list(State#state.process),
-    Tcp = tcp_list(State#state.tcp),
-    Udp = udp_list(State#state.udp),
-    Shuffled = shuffle(Processes ++ Tcp ++ Udp),
-    kill_one(Shuffled).
+    case select_node(State#state.nodes) of
+        [] -> nil; % Nothing to do.
+        [Node | _Rest] ->
+            Processes = process_list(State#state.process, Node),
+            Tcp = tcp_list(State#state.tcp, Node),
+            Udp = udp_list(State#state.udp, Node),
+            Shuffled = shuffle(Processes ++ Tcp ++ Udp),
+            kill_one(Shuffled)
+    end.
 
--spec process_list(boolean()) -> list(pid()).
-process_list(true) ->
-    processes();
-process_list(false) ->
+-spec select_node(list(node()) | atom()) -> node().
+select_node(L) when is_list(L) ->
+    shuffle(L);
+select_node(A) when is_atom(A) ->
+    shuffle(nodes(A)).
+
+-spec process_list(boolean(), node()) -> list(pid()).
+process_list(true, Node) ->
+    rpc:call(Node, erlang, processes, []);
+process_list(false, _Node) ->
     [].
 
--spec tcp_list(boolean()) -> list(port()).
-tcp_list(true) ->
-    lists:filter(fun (Port) -> erlang:port_info(Port, name) =:= {name, ?TCP_NAME} end, erlang:ports());
-tcp_list(false) ->
+-spec tcp_list(boolean(), node()) -> list(port()).
+tcp_list(true, Node) ->
+    Ports = rpc:call(Node, erlang, ports, []),
+    lists:filter(fun (Port) -> erlang:port_info(Port, name) =:= {name, ?TCP_NAME} end, Ports);
+tcp_list(false, _Node) ->
     [].
 
--spec udp_list(boolean()) -> list(port()).
-udp_list(true) ->
-    lists:filter(fun (Port) -> erlang:port_info(Port, name) =:= {name, ?UDP_NAME} end, erlang:ports());
-udp_list(false) ->
+-spec udp_list(boolean(), node()) -> list(port()).
+udp_list(true, Node) ->
+    Ports = rpc:call(Node, erlang, ports, []),
+    lists:filter(fun (Port) -> erlang:port_info(Port, name) =:= {name, ?UDP_NAME} end, Ports);
+udp_list(false, _Node) ->
     [].
 
 
