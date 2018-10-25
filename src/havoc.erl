@@ -30,17 +30,33 @@
 %%====================================================================
 %% API functions
 %%====================================================================
+%% @private
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, ok, []).
 
+%% @doc Begin to wreak havoc on your system using the default options.
+%% @end
 -spec on() -> ok.
 on() ->
     gen_server:call(?SERVER, {on, []}).
 
+%% @doc Begin to wreak havoc on your system.
+%% @param Opts A proplist that accepts the following options.
+%% <ul>
+%% <li>`avg_wait' - The average amount of time you would like to wait between
+%% kills. (default 5000)</li>
+%% <li>`deviation' - The deviation of time allowed between kills.
+%% (default 0.3)</li>
+%% <li>`process' - Whether or not to kill processes. (default true)</li>
+%% <li>`tcp' - Whether or not to kill TCP connections. (default false)</li>
+%% <li>`udp' - Whether or not to kill UDP connections. (default false)</li>
+%% </ul>
+%% @end
 -spec on(list(term)) -> ok.
 on(Opts) ->
     gen_server:call(?SERVER, {on, Opts}).
 
+%% @doc Stops killing things within your system.
 -spec off() -> ok.
 off() ->
     gen_server:call(?SERVER, off).
@@ -49,9 +65,11 @@ off() ->
 %% GenServer callbacks
 %%====================================================================
 
+%% @private
 init(ok) ->
     {ok, #state{}}.
 
+%% @private
 handle_call({on, Opts}, _From, #state{is_active = false} = State) ->
     Wait = proplists:get_value(avg_wait, Opts, 5000),
     Deviation = proplists:get_value(deviation, Opts, 0.3),
@@ -68,9 +86,11 @@ handle_call(off, _From, #state{is_active = true} = State) ->
 handle_call(_Msg, _From, State) ->
     {noreply, State}.
 
+%% @private
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
+%% @private
 handle_info(kill_something, #state{is_active = true} = State) ->
     try_kill_one(State),
     schedule(State#state.avg_wait, State#state.deviation),
