@@ -134,7 +134,8 @@ is_killable(Pid) when is_pid(Pid) ->
           end,
     not(erts_internal:is_system_process(Pid))
         andalso not(lists:member(App, [kernel, havoc]))
-        andalso not(is_shell(Pid));
+        andalso not(is_shell(Pid))
+        andalso not(is_supervisor(Pid));
 is_killable(Port) when is_port(Port) ->
     true.
 
@@ -175,4 +176,22 @@ is_shell(Pid) ->
                     end;
                 false -> false
             end
+    end.
+
+-spec is_supervisor(pid()) -> boolean().
+is_supervisor(Pid) ->
+    Init =
+        case erlang:process_info(Pid, initial_call) of
+            {initial_call, I} -> I;
+            undefined -> process_dead
+        end,
+    Translate =
+        case Init of
+            {proc_lib, init_p, 5} ->
+                proc_lib:translate_initial_call(Pid);
+            _ -> Init
+        end,
+    case Translate of
+        {supervisor, _, _} -> true;
+        _ -> false
     end.
