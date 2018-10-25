@@ -2,7 +2,7 @@ Havoc
 ======
 
 A ChaosMonkey style application that can randomly kill processes, as well as
-TCP and UDP connections.
+TCP and UDP connections. Inspired by [dLuna/chaos_monkey](https://github.com/dLuna/chaos_monkey).
 
 Basic Usage
 -----------
