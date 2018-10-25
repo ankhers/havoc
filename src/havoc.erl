@@ -57,7 +57,7 @@ handle_call({on, Opts}, _From, #state{is_active = false} = State) ->
     Killable = proplists:get_value(killable, Opts, [process]),
     Process = proplists:get_bool(process, Killable),
     Tcp = proplists:get_bool(tcp, Killable),
-    Udp = poplists:get_bool(udp, Killable),
+    Udp = proplists:get_bool(udp, Killable),
     NewState = State#state{is_active = true, avg_wait = Wait,
                            process = Process, tcp = Tcp, udp = Udp},
     schedule(Wait),
