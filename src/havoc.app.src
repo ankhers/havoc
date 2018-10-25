@@ -1,7 +1,7 @@
 {application, havoc,
- [{description, "An OTP application"},
+ [{description, "A ChaosMonkey style application to test the resiliency of your application"},
   {vsn, "0.1.0"},
-  {registered, []},
+  {registered, [havoc]},
   {mod, { havoc_app, []}},
   {applications,
    [kernel,
@@ -12,5 +12,5 @@
 
   {maintainers, ["Justin Wood"]},
   {licenses, ["Apache 2.0"]},
-  {links, []}
+  {links, [{"Github", "https://github.com/ankhers/havoc"}]}
  ]}.
