@@ -55,10 +55,9 @@ init(ok) ->
 handle_call({on, Opts}, _From, #state{is_active = false} = State) ->
     Wait = proplists:get_value(avg_wait, Opts, 5000),
     Deviation = proplists:get_value(deviation, Opts, 0.3),
-    Killable = proplists:get_value(killable, Opts, [process]),
-    Process = proplists:get_bool(process, Killable),
-    Tcp = proplists:get_bool(tcp, Killable),
-    Udp = proplists:get_bool(udp, Killable),
+    Process = proplists:get_bool(process, Opts),
+    Tcp = proplists:get_bool(tcp, Opts),
+    Udp = proplists:get_bool(udp, Opts),
     NewState = State#state{is_active = true, avg_wait = Wait,
                            deviation = Deviation, process = Process, tcp = Tcp,
                            udp = Udp},
