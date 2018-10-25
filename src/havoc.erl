@@ -18,12 +18,12 @@
 
 -record(state, {is_active = false,
                 avg_wait,
+                deviation,
                 process,
                 tcp,
                 udp
                }).
 
--define(DEFAULT_OPTS, [{avg_wait, 5000}]).
 -define(TCP_NAME, "tcp_inet").
 -define(UDP_NAME, "udp_inet").
 
@@ -54,13 +54,15 @@ init(ok) ->
 
 handle_call({on, Opts}, _From, #state{is_active = false} = State) ->
     Wait = proplists:get_value(avg_wait, Opts, 5000),
+    Deviation = proplists:get_value(deviation, Opts, 0.3),
     Killable = proplists:get_value(killable, Opts, [process]),
     Process = proplists:get_bool(process, Killable),
     Tcp = proplists:get_bool(tcp, Killable),
     Udp = proplists:get_bool(udp, Killable),
     NewState = State#state{is_active = true, avg_wait = Wait,
-                           process = Process, tcp = Tcp, udp = Udp},
-    schedule(Wait),
+                           deviation = Deviation, process = Process, tcp = Tcp,
+                           udp = Udp},
+    schedule(Wait, Deviation),
     {reply, ok, NewState};
 handle_call(off, _From, #state{is_active = true} = State) ->
     {reply, ok, State#state{is_active = false}};
@@ -72,7 +74,7 @@ handle_cast(_Msg, State) ->
 
 handle_info(kill_something, #state{is_active = true} = State) ->
     try_kill_one(State),
-    schedule(State#state.avg_wait),
+    schedule(State#state.avg_wait, State#state.deviation),
     {noreply, State};
 handle_info(_Msg, State) ->
     {noreply, State}.
@@ -80,9 +82,11 @@ handle_info(_Msg, State) ->
 %%====================================================================
 %% Internal functions
 %%====================================================================
--spec schedule(non_neg_integer()) -> reference().
-schedule(Wait) ->
-    erlang:send_after(Wait, self(), kill_something).
+-spec schedule(non_neg_integer(), non_neg_integer()) -> reference().
+schedule(Wait, Deviation) ->
+    Diff = round(Wait * Deviation),
+    Interval = rand:uniform(Diff * 2) + Wait - Diff,
+    erlang:send_after(Interval, self(), kill_something).
 
 -spec try_kill_one(#state{}) -> {ok, term()} | {error, nothing_to_kill}.
 try_kill_one(State) ->
