@@ -126,6 +126,14 @@ kill_one([H | T]) ->
             kill_one(T)
     end.
 
+%% http://erlang.org/doc/apps/
+-define(OTP_APPS, [asn1, common_test, compiler, crypto, debugger, dialyzer,
+                   diameter, edoc, eldap, erl_docgen, erl_interface, erts, et,
+                   eunit, ftp, hipe, inets, jinterface, kernel, megaco, mnesia,
+                   observer, odbc, os_mon, otp_mibs, parsetools, public_key,
+                   reltool, runtime_tools, sasl, snmp, ssh, ssl, stdlib,
+                   syntax_tools, tftp, tools, wx, xmerl]).
+
 -spec is_killable(pid() | port()) -> boolean().
 is_killable(Pid) when is_pid(Pid) ->
     App = case application:get_application(Pid) of
@@ -133,6 +141,7 @@ is_killable(Pid) when is_pid(Pid) ->
               undefined -> undefined
           end,
     not(erts_internal:is_system_process(Pid))
+        andalso not(lists:member(App, ?OTP_APPS))
         andalso not(lists:member(App, [kernel, havoc]))
         andalso not(is_shell(Pid))
         andalso not(is_supervisor(Pid));
