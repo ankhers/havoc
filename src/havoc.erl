@@ -117,7 +117,7 @@ schedule(Wait, Deviation) ->
 
 -spec try_kill_one(#state{}) -> {ok, term()} | {error, nothing_to_kill}.
 try_kill_one(State) ->
-    case select_node(State#state.nodes) of
+    case shuffle_nodes(State#state.nodes) of
         [] -> nil; % Nothing to do.
         [Node | _Rest] ->
             Processes = process_list(State#state.process, Node),
@@ -127,10 +127,10 @@ try_kill_one(State) ->
             kill_one(Shuffled)
     end.
 
--spec select_node(list(node()) | atom()) -> node().
-select_node(L) when is_list(L) ->
+-spec shuffle_nodes(list(node()) | atom()) -> [node()].
+shuffle_nodes(L) when is_list(L) ->
     shuffle(L);
-select_node(A) when is_atom(A) ->
+shuffle_nodes(A) when is_atom(A) ->
     shuffle(nodes(A)).
 
 -spec process_list(boolean(), node()) -> list(pid()).
