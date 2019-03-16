@@ -206,12 +206,20 @@ kill(Pid) when is_pid(Pid) ->
             end
     end;
 kill(Port) when is_port(Port) ->
-    case erlang:port_info(Port, name) of
+    {connected, Pid} = erlang:port_info(Port, connected),
+    {ok, [{active, Active}]} = inet:getopts(Port, [active]),
+    Msg = case erlang:port_info(Port, name) of
         {name, ?TCP_NAME} ->
-            gen_tcp:close(Port);
+            gen_tcp:close(Port),
+            {tcp_closed, Port};
         {name, ?UDP_NAME} ->
-            gen_udp:close(Port)
-    end.
+            gen_udp:close(Port),
+            {udp_closed, Port}
+    end,
+    if Active /= false ->
+            Pid ! Msg
+    end,
+    ok.
 
 -spec is_shell(pid()) -> boolean().
 is_shell(Pid) ->
