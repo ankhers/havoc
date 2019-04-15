@@ -22,7 +22,9 @@
                 process,
                 tcp,
                 udp,
-                nodes
+                nodes,
+                applications,
+                supervisors
                }).
 
 -define(TCP_NAME, "tcp_inet").
@@ -45,14 +47,18 @@ on() ->
 %% @param Opts A proplist that accepts the following options.
 %% <ul>
 %% <li>`avg_wait' - The average amount of time you would like to wait between
-%% kills. (default 5000)</li>
+%% kills. (default `5000')</li>
 %% <li>`deviation' - The deviation of time allowed between kills.
-%% (default 0.3)</li>
-%% <li>`process' - Whether or not to kill processes. (default true)</li>
-%% <li>`tcp' - Whether or not to kill TCP connections. (default false)</li>
-%% <li>`udp' - Whether or not to kill UDP connections. (default false)</li>
+%% (default `0.3')</li>
+%% <li>`process' - Whether or not to kill processes. (default `true')</li>
+%% <li>`tcp' - Whether or not to kill TCP connections. (default `false')</li>
+%% <li>`udp' - Whether or not to kill UDP connections. (default `false')</li>
 %% <li>`nodes' - Either a list of atom node names, or a single atom that is
 %% accepted by `erlang:nodes/1'. (Default `this')</li>
+%% <li>`applications' - A list of application names that you want to
+%% target. (defaults to all applications except `kernel' and `havoc')</li>
+%% <li>`supervisors' - A list of supervisors that you want to target.
+%% Can be any valid supervisor reference. (defaults to all supervisors)</li>
 %% </ul>
 %% @end
 -spec on(list(term)) -> ok.
@@ -84,9 +90,13 @@ handle_call({on, Opts}, _From, #state{is_active = false} = State) ->
     Tcp = proplists:get_bool(tcp, Opts),
     Udp = proplists:get_bool(udp, Opts),
     Nodes = proplists:get_value(nodes, Opts, this),
+    Applications = proplists:get_value(applications, Opts),
+    Supervisors = proplists:get_value(supervisors, Opts),
     NewState = State#state{is_active = true, avg_wait = Wait,
                            deviation = Deviation, process = Process, tcp = Tcp,
-                           udp = Udp, nodes = Nodes},
+                           udp = Udp, nodes = Nodes,
+                           applications = Applications,
+                           supervisors = Supervisors},
     schedule(Wait, Deviation),
     {reply, ok, NewState};
 handle_call(off, _From, #state{is_active = true} = State) ->
@@ -124,7 +134,7 @@ try_kill_one(State) ->
             Tcp = tcp_list(State#state.tcp, Node),
             Udp = udp_list(State#state.udp, Node),
             Shuffled = shuffle(Processes ++ Tcp ++ Udp),
-            kill_one(Shuffled)
+            kill_one(Shuffled, State)
     end.
 
 -spec shuffle_nodes(list(node()) | atom()) -> [node()].
@@ -159,14 +169,14 @@ shuffle(L) ->
     Shuffled = lists:sort([{rand:uniform(), X} || X <- L]),
     [X || {_, X} <- Shuffled].
 
--spec kill_one(list(pid())) -> {ok, term()} | {error, nothing_to_kill}.
-kill_one([]) -> {error, nothing_to_kill};
-kill_one([H | T]) ->
-    case is_killable(H) of
+-spec kill_one(list(pid()), #state{}) -> {ok, term()} | {error, nothing_to_kill}.
+kill_one([], _State) -> {error, nothing_to_kill};
+kill_one([H | T], State) ->
+    case is_killable(H, State) of
         true ->
             kill(H);
         false ->
-            kill_one(T)
+            kill_one(T, State)
     end.
 
 %% http://erlang.org/doc/apps/
@@ -177,19 +187,38 @@ kill_one([H | T]) ->
                    reltool, runtime_tools, sasl, snmp, ssh, ssl, stdlib,
                    syntax_tools, tftp, tools, wx, xmerl]).
 
--spec is_killable(pid() | port()) -> boolean().
-is_killable(Pid) when is_pid(Pid) ->
+-spec is_killable(pid() | port(), #state{}) -> boolean().
+is_killable(Pid, State) when is_pid(Pid) ->
     App = case application:get_application(Pid) of
               {ok, A} -> A;
               undefined -> undefined
           end,
+
     not(erts_internal:is_system_process(Pid))
         andalso not(lists:member(App, ?OTP_APPS))
         andalso not(lists:member(App, [kernel, havoc]))
         andalso not(is_shell(Pid))
-        andalso not(is_supervisor(Pid));
-is_killable(Port) when is_port(Port) ->
+        andalso not(is_supervisor(Pid))
+        andalso app_killable(App, State#state.applications)
+        andalso supervisor_killable(Pid, State#state.supervisors);
+is_killable(Port, _State) when is_port(Port) ->
     true.
+
+-spec app_killable(atom(), proplists:proplist()) -> boolean().
+app_killable(_App, undefined) ->
+    true;
+app_killable(App, Applications) ->
+    lists:member(App, Applications).
+
+supervisor_killable(_Pid, undefined) ->
+    true;
+supervisor_killable(Pid, Supervisors) ->
+    lists:any(fun(Sup) ->
+                      Children = lists:map(fun({_Id, Child, _Type, _Mods}) ->
+                                                   Child
+                                           end, supervisor:which_children(Sup)),
+                      lists:member(Pid, Children)
+              end, Supervisors).
 
 -spec kill(pid() | port()) -> term().
 kill(Pid) when is_pid(Pid) ->
