@@ -9,8 +9,6 @@
    ]},
   {env,[]},
   {modules, []},
-
-  {maintainers, ["Justin Wood"]},
   {licenses, ["Apache 2.0"]},
   {links, [{"Github", "https://github.com/ankhers/havoc"}]}
  ]}.
