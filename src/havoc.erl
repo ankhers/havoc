@@ -97,10 +97,12 @@ handle_call({on, Opts}, _From, #state{is_active = false} = State) ->
                            udp = Udp, nodes = Nodes,
                            applications = Applications,
                            supervisors = Supervisors},
-    schedule(Wait, Deviation),
+    self() ! kill_something,
     {reply, ok, NewState};
+
 handle_call(off, _From, #state{is_active = true} = State) ->
     {reply, ok, State#state{is_active = false}};
+
 handle_call(_Msg, _From, State) ->
     {noreply, State}.
 
@@ -113,6 +115,7 @@ handle_info(kill_something, #state{is_active = true} = State) ->
     try_kill_one(State),
     schedule(State#state.avg_wait, State#state.deviation),
     {noreply, State};
+
 handle_info(_Msg, State) ->
     {noreply, State}.
 
