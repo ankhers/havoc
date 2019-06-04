@@ -24,7 +24,8 @@
                 udp,
                 nodes,
                 applications,
-                supervisors
+                supervisors,
+                prekill_callback
                }).
 
 -define(TCP_NAME, "tcp_inet").
@@ -59,6 +60,7 @@ on() ->
 %% target. (defaults to all applications except `kernel' and `havoc')</li>
 %% <li>`supervisors' - A list of supervisors that you want to target.
 %% Can be any valid supervisor reference. (defaults to all supervisors)</li>
+%% <li>`prekill_callback' - A Fun that gets called just before killing.</li>
 %% </ul>
 %% @end
 -spec on(list(term)) -> ok.
@@ -92,11 +94,13 @@ handle_call({on, Opts}, _From, #state{is_active = false} = State) ->
     Nodes = proplists:get_value(nodes, Opts, this),
     Applications = proplists:get_value(applications, Opts),
     Supervisors = proplists:get_value(supervisors, Opts),
+    PrekillCallback = proplists:get_value(prekill_callback, Opts, fun default_prekill_callback/0),
     NewState = State#state{is_active = true, avg_wait = Wait,
                            deviation = Deviation, process = Process, tcp = Tcp,
                            udp = Udp, nodes = Nodes,
                            applications = Applications,
-                           supervisors = Supervisors},
+                           supervisors = Supervisors,
+                           prekill_callback = PrekillCallback},
     self() ! kill_something,
     {reply, ok, NewState};
 
@@ -177,10 +181,19 @@ kill_one([], _State) -> {error, nothing_to_kill};
 kill_one([H | T], State) ->
     case is_killable(H, State) of
         true ->
+            prekill_callback(State#state.prekill_callback, H),
             kill(H);
         false ->
             kill_one(T, State)
     end.
+
+-spec prekill_callback(function(), pid() | port()) -> ok.
+prekill_callback(Fun, PidOrPort) when is_function(Fun) ->
+    apply(Fun, [PidOrPort]),
+    ok.
+
+-spec default_prekill_callback() -> function().
+default_prekill_callback() -> fun(_X) -> ok end.
 
 %% http://erlang.org/doc/apps/
 -define(OTP_APPS, [asn1, common_test, compiler, crypto, debugger, dialyzer,
