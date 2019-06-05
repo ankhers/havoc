@@ -21,6 +21,11 @@ allowed options
 * `udp` - Whether or not to kill UDP connections. (default false)
 * `nodes` - Either a list of atoms for node names, or any value that
   `erlang:nodes/1` accepts.
+* `applications` - A list of application names that you want to target.
+  (defaults to all applications except `kernel` and `havoc`)
+* `supervisors` - A list of supervisors that you want to target. Can be any
+  valid supervisor reference. (defaults to all supervisors)
+* `prekill_callback` - A `Fun` that gets called just before killing.
 
 You can specify options using `havoc:on/1`.
 

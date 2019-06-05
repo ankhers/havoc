@@ -60,7 +60,7 @@ on() ->
 %% target. (defaults to all applications except `kernel' and `havoc')</li>
 %% <li>`supervisors' - A list of supervisors that you want to target.
 %% Can be any valid supervisor reference. (defaults to all supervisors)</li>
-%% <li>`prekill_callback' - A Fun that gets called just before killing.</li>
+%% <li>`prekill_callback' - A `Fun' that gets called just before killing.</li>
 %% </ul>
 %% @end
 -spec on(list(term)) -> ok.
