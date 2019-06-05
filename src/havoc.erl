@@ -94,7 +94,7 @@ handle_call({on, Opts}, _From, #state{is_active = false} = State) ->
     Nodes = proplists:get_value(nodes, Opts, this),
     Applications = proplists:get_value(applications, Opts),
     Supervisors = proplists:get_value(supervisors, Opts),
-    PrekillCallback = proplists:get_value(prekill_callback, Opts, fun default_prekill_callback/0),
+    PrekillCallback = proplists:get_value(prekill_callback, Opts, default_prekill_callback()),
     NewState = State#state{is_active = true, avg_wait = Wait,
                            deviation = Deviation, process = Process, tcp = Tcp,
                            udp = Udp, nodes = Nodes,
