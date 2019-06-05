@@ -1,6 +1,6 @@
 {application, havoc,
  [{description, "A ChaosMonkey style application to test the resiliency of your application"},
-  {vsn, "0.2.0"},
+  {vsn, "0.2.1"},
   {registered, [havoc]},
   {mod, { havoc_app, []}},
   {applications,
