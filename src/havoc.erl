@@ -214,7 +214,7 @@ is_killable(Pid, State) when is_pid(Pid) ->
         andalso not(lists:member(App, ?OTP_APPS))
         andalso not(lists:member(App, [kernel, havoc]))
         andalso not(is_shell(Pid))
-        andalso not(is_supervisor(Pid))
+        andalso not(is_supervisor_or_appmaster(Pid))
         andalso app_killable(App, State#state.applications)
         andalso supervisor_killable(Pid, State#state.supervisors);
 is_killable(Port, _State) when is_port(Port) ->
@@ -283,8 +283,8 @@ is_shell(Pid) ->
             end
     end.
 
--spec is_supervisor(pid()) -> boolean().
-is_supervisor(Pid) ->
+-spec is_supervisor_or_appmaster(pid()) -> boolean().
+is_supervisor_or_appmaster(Pid) ->
     Init =
         case erlang:process_info(Pid, initial_call) of
             {initial_call, I} -> I;
@@ -298,5 +298,6 @@ is_supervisor(Pid) ->
         end,
     case Translate of
         {supervisor, _, _} -> true;
+        {application_master, _, _} -> true;
         _ -> false
     end.
