@@ -126,11 +126,13 @@ handle_info(_Msg, State) ->
 %%====================================================================
 %% Internal functions
 %%====================================================================
--spec schedule(non_neg_integer(), non_neg_integer()) -> reference().
+-spec schedule(non_neg_integer(), number()) -> ok.
 schedule(Wait, Deviation) ->
-    Diff = round(Wait * Deviation),
-    Interval = rand:uniform(Diff * 2) + Wait - Diff,
-    erlang:send_after(Interval, self(), kill_something).
+    case round(Wait * (1 + Deviation * (2 * rand:uniform() - 1))) of
+        Delay when Delay > 0 -> erlang:send_after(Delay, self(), kill_something);
+        _ -> self() ! kill_something
+    end,
+    ok.
 
 -spec try_kill_one(#state{}) -> {ok, term()} | {error, nothing_to_kill}.
 try_kill_one(State) ->
