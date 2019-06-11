@@ -300,6 +300,7 @@ is_supervisor_or_appmaster(Pid) ->
         end,
     case Translate of
         {supervisor, _, _} -> true;
+        {application_controller, _, _} -> true;
         {application_master, _, _} -> true;
         _ -> false
     end.
