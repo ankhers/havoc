@@ -25,6 +25,7 @@
                 nodes,
                 applications,
                 supervisors,
+                killable_callback,
                 prekill_callback
                }).
 
@@ -60,6 +61,8 @@ on() ->
 %% target. (defaults to all applications except `kernel' and `havoc')</li>
 %% <li>`supervisors' - A list of supervisors that you want to target.
 %% Can be any valid supervisor reference. (defaults to all supervisors)</li>
+%% <li>`killable_callback' - A `Fun' that gets called to decide if a `pid' or
+%% `port' may be killed or not by returning `true' or `false'.</li>
 %% <li>`prekill_callback' - A `Fun' that gets called just before killing.</li>
 %% </ul>
 %% @end
@@ -94,12 +97,14 @@ handle_call({on, Opts}, _From, #state{is_active = false} = State) ->
     Nodes = proplists:get_value(nodes, Opts, this),
     Applications = proplists:get_value(applications, Opts),
     Supervisors = proplists:get_value(supervisors, Opts),
+    KillableCallback = proplists:get_value(killable_callback, Opts, default_killable_callback()),
     PrekillCallback = proplists:get_value(prekill_callback, Opts, default_prekill_callback()),
     NewState = State#state{is_active = true, avg_wait = Wait,
                            deviation = Deviation, process = Process, tcp = Tcp,
                            udp = Udp, nodes = Nodes,
                            applications = Applications,
                            supervisors = Supervisors,
+                           killable_callback = KillableCallback,
                            prekill_callback = PrekillCallback},
     self() ! kill_something,
     {reply, ok, NewState};
@@ -181,7 +186,10 @@ shuffle(L) ->
 -spec kill_one(list(pid()), #state{}) -> {ok, term()} | {error, nothing_to_kill}.
 kill_one([], _State) -> {error, nothing_to_kill};
 kill_one([H | T], State) ->
-    case is_killable(H, State) of
+    case
+        is_killable(H, State) andalso
+        killable_callback(State#state.killable_callback, H)
+    of
         true ->
             prekill_callback(State#state.prekill_callback, H),
             kill(H);
@@ -189,12 +197,22 @@ kill_one([H | T], State) ->
             kill_one(T, State)
     end.
 
--spec prekill_callback(function(), pid() | port()) -> ok.
-prekill_callback(Fun, PidOrPort) when is_function(Fun) ->
-    apply(Fun, [PidOrPort]),
+-spec killable_callback(fun((PidOrPort) -> Result), PidOrPort) -> Result
+    when PidOrPort :: pid() | port(),
+         Result :: boolean().
+killable_callback(Fun, PidOrPort) when is_function(Fun, 1) ->
+    Fun(PidOrPort).
+
+-spec default_killable_callback() -> fun((pid() | port()) -> true).
+default_killable_callback() -> fun(_X) -> true end.
+
+-spec prekill_callback(fun((PidOrPort) -> any()), PidOrPort) -> ok
+    when PidOrPort :: pid() | port().
+prekill_callback(Fun, PidOrPort) when is_function(Fun, 1) ->
+    Fun(PidOrPort),
     ok.
 
--spec default_prekill_callback() -> function().
+-spec default_prekill_callback() -> fun((pid() | port()) -> ok).
 default_prekill_callback() -> fun(_X) -> ok end.
 
 %% http://erlang.org/doc/apps/

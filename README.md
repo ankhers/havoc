@@ -25,6 +25,8 @@ allowed options
   (defaults to all applications except `kernel` and `havoc`)
 * `supervisors` - A list of supervisors that you want to target. Can be any
   valid supervisor reference. (defaults to all supervisors)
+* `killable_callback` - A `Fun` that gets called to decide if a `pid` or
+  `port` may be killed or not by returning `true` or `false`.
 * `prekill_callback` - A `Fun` that gets called just before killing.
 
 You can specify options using `havoc:on/1`.
