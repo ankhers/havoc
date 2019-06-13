@@ -16,6 +16,7 @@ allowed options
 * `avg_wait` - The average amount of time you would like to wait between kills.
   (default 5000)
 * `deviation` - The deviation of time allowed between kills. (default 0.3)
+* `supervisor` - Whether or not to kill supervisors. (default false)
 * `process` - Whether or not to kill processes. (default true)
 * `tcp` - Whether or not to kill TCP connections. (default false)
 * `udp` - Whether or not to kill UDP connections. (default false)

@@ -19,6 +19,7 @@
 -record(state, {is_active = false,
                 avg_wait,
                 deviation,
+                supervisor,
                 process,
                 tcp,
                 udp,
@@ -52,6 +53,7 @@ on() ->
 %% kills. (default `5000')</li>
 %% <li>`deviation' - The deviation of time allowed between kills.
 %% (default `0.3')</li>
+%% <li>`supervisor' - Whether or not to kill supervisors. (default `false')</li>
 %% <li>`process' - Whether or not to kill processes. (default `true')</li>
 %% <li>`tcp' - Whether or not to kill TCP connections. (default `false')</li>
 %% <li>`udp' - Whether or not to kill UDP connections. (default `false')</li>
@@ -87,6 +89,7 @@ init(ok) ->
 handle_call({on, Opts}, _From, #state{is_active = false} = State) ->
     Wait = proplists:get_value(avg_wait, Opts, 5000),
     Deviation = proplists:get_value(deviation, Opts, 0.3),
+    Supervisor = proplists:get_bool(supervisor, Opts),
     Process =
         case proplists:lookup(process, Opts) of
             {process, Val} -> Val;
@@ -100,7 +103,8 @@ handle_call({on, Opts}, _From, #state{is_active = false} = State) ->
     KillableCallback = proplists:get_value(killable_callback, Opts, default_killable_callback()),
     PrekillCallback = proplists:get_value(prekill_callback, Opts, default_prekill_callback()),
     NewState = State#state{is_active = true, avg_wait = Wait,
-                           deviation = Deviation, process = Process, tcp = Tcp,
+                           deviation = Deviation, supervisor = Supervisor,
+                           process = Process, tcp = Tcp,
                            udp = Udp, nodes = Nodes,
                            applications = Applications,
                            supervisors = Supervisors,
@@ -230,11 +234,17 @@ is_killable(Pid, State) when is_pid(Pid) ->
               undefined -> undefined
           end,
 
+    Module = get_initial_call_module(Pid),
+
     not(erts_internal:is_system_process(Pid))
+        andalso not(is_application_controller(Pid))
+        andalso Module =/= application_master
         andalso not(lists:member(App, ?OTP_APPS))
         andalso not(lists:member(App, [kernel, havoc]))
         andalso not(is_shell(Pid))
-        andalso not(is_supervisor_or_appmaster(Pid))
+        andalso (Module =/= supervisor
+            orelse State#state.supervisor
+            andalso not(is_application_top_supervisor(Pid)))
         andalso app_killable(App, State#state.applications)
         andalso supervisor_killable(Pid, State#state.supervisors);
 is_killable(Port, _State) when is_port(Port) ->
@@ -303,22 +313,32 @@ is_shell(Pid) ->
             end
     end.
 
--spec is_supervisor_or_appmaster(pid()) -> boolean().
-is_supervisor_or_appmaster(Pid) ->
-    Init =
-        case erlang:process_info(Pid, initial_call) of
-            {initial_call, I} -> I;
-            undefined -> process_dead
-        end,
-    Translate =
-        case Init of
-            {proc_lib, init_p, 5} ->
-                proc_lib:translate_initial_call(Pid);
-            _ -> Init
-        end,
-    case Translate of
-        {supervisor, _, _} -> true;
-        {application_controller, _, _} -> true;
-        {application_master, _, _} -> true;
-        _ -> false
+-spec get_initial_call_module(pid()) -> module() | undefined.
+get_initial_call_module(Pid) ->
+    case erlang:process_info(Pid, initial_call) of
+        {initial_call, {proc_lib, init_p, 5}} ->
+            {Module, _, _} = proc_lib:translate_initial_call(Pid),
+            Module;
+        {initial_call, {Module, _, _}} ->
+            Module;
+        _ ->
+            undefined
     end.
+
+-spec is_application_top_supervisor(pid()) -> boolean().
+is_application_top_supervisor(Pid) ->
+    case erlang:process_info(Pid, dictionary) of
+        {dictionary, Dict} ->
+            case lists:keyfind('$ancestors', 1, Dict) of
+                {'$ancestors', [Ancestor]} when is_pid(Ancestor) ->
+                    application_master =:= get_initial_call_module(Ancestor);
+                _ ->
+                    false
+            end;
+        _ ->
+            false
+    end.
+
+-spec is_application_controller(pid()) -> boolean().
+is_application_controller(Pid) ->
+    Pid =:= whereis(application_controller).
