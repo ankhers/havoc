@@ -63,7 +63,7 @@ on() ->
 %% <li>`applications' - A list of application names that you want to
 %% target. (defaults to all applications except `kernel' and `havoc')</li>
 %% <li> `otp_applications' - A list of OTP applications that you would
-%% like to target. (default `[]')
+%% like to target. (default `[]')</li>
 %% <li>`supervisors' - A list of supervisors that you want to target.
 %% Can be any valid supervisor reference. (defaults to all supervisors)</li>
 %% <li>`killable_callback' - A `Fun' that gets called to decide if a `pid' or
