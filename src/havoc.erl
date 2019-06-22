@@ -25,6 +25,7 @@
                 udp,
                 nodes,
                 applications,
+                otp_applications,
                 supervisors,
                 killable_callback,
                 prekill_callback
@@ -58,9 +59,11 @@ on() ->
 %% <li>`tcp' - Whether or not to kill TCP connections. (default `false')</li>
 %% <li>`udp' - Whether or not to kill UDP connections. (default `false')</li>
 %% <li>`nodes' - Either a list of atom node names, or a single atom that is
-%% accepted by `erlang:nodes/1'. (Default `this')</li>
+%% accepted by `erlang:nodes/1'. (default `this')</li>
 %% <li>`applications' - A list of application names that you want to
 %% target. (defaults to all applications except `kernel' and `havoc')</li>
+%% <li> `otp_applications' - A list of OTP applications that you would
+%% like to target. (default `[]')
 %% <li>`supervisors' - A list of supervisors that you want to target.
 %% Can be any valid supervisor reference. (defaults to all supervisors)</li>
 %% <li>`killable_callback' - A `Fun' that gets called to decide if a `pid' or
@@ -99,6 +102,7 @@ handle_call({on, Opts}, _From, #state{is_active = false} = State) ->
     Udp = proplists:get_bool(udp, Opts),
     Nodes = proplists:get_value(nodes, Opts, this),
     Applications = proplists:get_value(applications, Opts),
+    OTPApplications = proplists:get_value(otp_applications, Opts, []),
     Supervisors = proplists:get_value(supervisors, Opts),
     KillableCallback = proplists:get_value(killable_callback, Opts, default_killable_callback()),
     PrekillCallback = proplists:get_value(prekill_callback, Opts, default_prekill_callback()),
@@ -107,6 +111,7 @@ handle_call({on, Opts}, _From, #state{is_active = false} = State) ->
                            process = Process, tcp = Tcp,
                            udp = Udp, nodes = Nodes,
                            applications = Applications,
+                           otp_applications = OTPApplications,
                            supervisors = Supervisors,
                            killable_callback = KillableCallback,
                            prekill_callback = PrekillCallback},
@@ -239,7 +244,7 @@ is_killable(Pid, State) when is_pid(Pid) ->
     not(erts_internal:is_system_process(Pid))
         andalso not(is_application_controller(Pid))
         andalso Module =/= application_master
-        andalso not(lists:member(App, ?OTP_APPS))
+        andalso not(lists:member(App, ?OTP_APPS -- State#state.otp_applications))
         andalso not(lists:member(App, [kernel, havoc]))
         andalso not(is_shell(Pid))
         andalso (Module =/= supervisor
