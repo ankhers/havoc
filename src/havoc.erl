@@ -71,7 +71,7 @@ on() ->
 %% <li>`prekill_callback' - A `Fun' that gets called just before killing.</li>
 %% </ul>
 %% @end
--spec on(list(term)) -> ok.
+-spec on(list(term())) -> ok.
 on(Opts) ->
     gen_server:call(?SERVER, {on, Opts}).
 
@@ -255,21 +255,28 @@ is_killable(Pid, State) when is_pid(Pid) ->
 is_killable(Port, _State) when is_port(Port) ->
     true.
 
--spec app_killable(atom(), proplists:proplist()) -> boolean().
+-spec app_killable(atom(), undefined | [atom()]) -> boolean().
 app_killable(_App, undefined) ->
     true;
 app_killable(App, Applications) ->
     lists:member(App, Applications).
 
+-spec supervisor_killable(pid(), undefined | [supervisor:sup_ref()]) -> boolean().
 supervisor_killable(_Pid, undefined) ->
     true;
 supervisor_killable(Pid, Supervisors) ->
     lists:any(fun(Sup) ->
-                      Children = lists:map(fun({_Id, Child, _Type, _Mods}) ->
-                                                   Child
-                                           end, supervisor:which_children(Sup)),
-                      lists:member(Pid, Children)
+                  supervisor_killable1(Pid, supervisor:which_children(Sup))
               end, Supervisors).
+
+supervisor_killable1(_, []) ->
+    false;
+supervisor_killable1(Pid, [{_, Pid, _, _}|_]) ->
+    true;
+supervisor_killable1(Pid, [{_, SupPid, supervisor, _}|Children]) ->
+    supervisor_killable1(Pid, Children ++ supervisor:which_children(SupPid));
+supervisor_killable1(Pid, [_|Children]) ->
+    supervisor_killable1(Pid, Children).
 
 -spec kill(pid() | port()) -> term().
 kill(Pid) when is_pid(Pid) ->
