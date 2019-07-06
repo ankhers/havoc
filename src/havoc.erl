@@ -250,8 +250,8 @@ is_killable(Pid, State) when is_pid(Pid) ->
         andalso (Module =/= supervisor
             orelse State#state.supervisor
             andalso not(is_application_top_supervisor(Pid)))
-        andalso app_killable(App, State#state.applications)
-        andalso supervisor_killable(Pid, State#state.supervisors);
+        andalso (app_killable(App, State#state.applications)
+                 orelse supervisor_killable(Pid, State#state.supervisors));
 is_killable(Port, _State) when is_port(Port) ->
     true.
 
