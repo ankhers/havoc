@@ -274,7 +274,13 @@ supervisor_killable1(_, []) ->
 supervisor_killable1(Pid, [{_, Pid, _, _}|_]) ->
     true;
 supervisor_killable1(Pid, [{_, SupPid, supervisor, _}|Children]) ->
-    supervisor_killable1(Pid, Children ++ supervisor:which_children(SupPid));
+    SupChildren = try
+        supervisor:which_children(SupPid)
+    catch
+        exit:{noproc, _} ->
+            []
+    end,
+    supervisor_killable1(Pid, Children ++ SupChildren);
 supervisor_killable1(Pid, [_|Children]) ->
     supervisor_killable1(Pid, Children).
 
