@@ -263,7 +263,7 @@ app_killable(App, Applications) ->
 
 -spec supervisor_killable(pid(), undefined | [supervisor:sup_ref()]) -> boolean().
 supervisor_killable(_Pid, undefined) ->
-    true;
+    false;
 supervisor_killable(Pid, Supervisors) ->
     lists:any(fun(Sup) ->
                   supervisor_killable1(Pid, supervisor:which_children(Sup))
