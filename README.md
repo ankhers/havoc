@@ -38,6 +38,12 @@ You can specify options using `havoc:on/1`.
 havoc:on([{avg_wait, 3000}, {deviation, 0.5}, process, tcp])
 ```
 
+It is also possible to check if havoc is currently active.
+
+``` erlang
+havoc:is_active()
+```
+
 Build
 -----
 

@@ -9,7 +9,7 @@
 
 %% API
 -export([start_link/0]).
--export([on/0, on/1, off/0]).
+-export([on/0, on/1, off/0, is_active/0]).
 
 %% GenServer callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
@@ -80,6 +80,12 @@ on(Opts) ->
 off() ->
     gen_server:call(?SERVER, off).
 
+%% @doc Get the current status.
+-spec is_active() -> boolean().
+is_active() ->
+    gen_server:call(?SERVER, is_active).
+
+
 %%====================================================================
 %% GenServer callbacks
 %%====================================================================
@@ -120,6 +126,9 @@ handle_call({on, Opts}, _From, #state{is_active = false} = State) ->
 
 handle_call(off, _From, #state{is_active = true} = State) ->
     {reply, ok, State#state{is_active = false}};
+
+handle_call(is_active, _From, #state{is_active = IsActive} = State) ->
+    {reply, IsActive, State};
 
 handle_call(_Msg, _From, State) ->
     {noreply, State}.
